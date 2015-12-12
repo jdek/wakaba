@@ -1,9 +1,12 @@
 #include "sfh.h"
 
 struct file_entry{
-	size_t len;
-	unsigned long long id;
-	char hash[HASH_STRLEN];
+	char *data; // Cached data.
+	size_t len; // Data length.
+	unsigned long long id; // 64bit ID.
+	char hash[HASH_STRLEN]; // File hash.
+	char ext[32]; // File extension.
+	time_t last_access; // Last acccess time.
 };
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -12,7 +15,7 @@ static struct lnode *file_list;
 
 #define serialize_id(ID, BUF, LEN) {snprintf(BUF, LEN, DATA_DIR "database/%llx", ID);}
 
-int database_write(struct file_entry *fe, char *data)
+int database_write(struct file_entry *fe)
 {
 	char name[256];
 	serialize_id(fe->id, name, 256);
@@ -21,21 +24,30 @@ int database_write(struct file_entry *fe, char *data)
 	if (!fp)
 		return 1;
 
-	fwrite(data, 1, fe->len, fp);
+	fwrite(fe->data, 1, fe->len, fp);
+	fe->last_access = time(0);
 
 	fclose(fp);
 	return 0;
 }
 
-char *database_read(struct file_entry *fe)
+void database_read(struct file_entry *fe)
 {
-	char *data;
+	fe->last_access = time(0);
+	// Only read if isn't already cached.
+	if (fe->data){
+		puts("LOADED FROM CACHE");
+		return;
+	}
+	puts("LOADED FROM DISK");
 	char name[256];
 	serialize_id(fe->id, name, 256);
 
 	FILE *fp = fopen(name, "rb");
-	if (!fp)
-		return 0;
+	if (!fp){
+		fe->data = 0;
+		return;
+	}
 
 	if (fe->len == 0){
 		fseek(fp, 0, SEEK_END);
@@ -43,11 +55,10 @@ char *database_read(struct file_entry *fe)
 		fseek(fp, 0, SEEK_SET);
 	}
 
-	data = malloc(fe->len);
-	fread(data, 1, fe->len, fp);
+	fe->data = malloc(fe->len);
+	fread(fe->data, 1, fe->len, fp);
 
 	fclose(fp);
-	return data;
 }
 
 void printhash(unsigned char *hash, char *buf)
@@ -103,17 +114,17 @@ unsigned long long database_push(struct request *r)
 		return id;
 	}
 
+	fe->data = r->data;
 	fe->len = r->len;
 	fe->id = next_id++;
+	strcpy(fe->ext, r->ext);
 	n->data = fe;
 
 	pthread_mutex_lock(&lock);
 	file_list = lnode_push(file_list, n);
 	pthread_mutex_unlock(&lock);
 
-	database_write(fe, r->data);
-
-	cache_push(r->data, r->len, fe->id);
+	database_write(fe);
 
 	return fe->id;
 }
@@ -146,6 +157,12 @@ void database_pop(struct lnode *node)
 	pthread_mutex_unlock(&lock);
 }
 
+static void database_uncache(struct file_entry *fe)
+{
+	free(fe->data);
+	fe->data = 0;
+}
+
 int database_rm(char *name)
 {
 	unsigned long long id = strtoull(name, 0, 16);
@@ -154,8 +171,8 @@ int database_rm(char *name)
 	if (!node)
 		return 1;
 
+	database_uncache(node->data);
 	database_pop(node);
-	cache_rm(id);
 
 	char buf[512];
 	snprintf(buf, 512, DATA_DIR "/database/%llx", id);
@@ -179,31 +196,18 @@ void database_getfile(struct request *r)
 		return;
 	}
 
-	//Check the cache first.
-	struct cache_entry *ce = cache_get(id);
-	if (ce){
-		r->data = ce->data;
-		r->len = ce->len;
-		return;
-	}
-
 	struct lnode *n = database_get(id);
 
 	if (n){
 		entry = n->data;
-		char *data = database_read(entry);
+		database_read(entry);
 
-		if (!data){
+		if (!entry->data){
 			r->data = 0;
 			return;
 		}
 
-		r->data = data;
-
-		//Put back in cache.
-		if (!ce)
-			cache_push(data, entry->len, entry->id);
-
+		r->data = entry->data;
 		r->len = entry->len;
 	}
 }
@@ -239,17 +243,16 @@ int database_init()
 
 			struct file_entry fe;
 			char *end = 0;
-			char *data = 0;
 
 			fe.id = strtoull(ent->d_name, &end, 16);
 			if (end && *end)
 				continue;
 			fe.len = 0; //Will be filled in by database_read.
-			data = database_read(&fe);
-			hash(data, fe.len, fe.hash);
+			database_read(&fe);
+			hash(fe.data, fe.len, fe.hash);
 
 			fprintf(fp, "%llx %zu %s\n", fe.id, fe.len, fe.hash);
-			free(data);
+			free(fe.data);
 		}
 
 		closedir(dp);
@@ -269,9 +272,9 @@ int database_init()
 		}
 
 		if (!strcmp(fe->hash, "0")){ //File has no hash, generate one.
-			char *data = database_read(fe);
-			hash(data, fe->len, fe->hash);
-			free(data);
+			database_read(fe);
+			hash(fe->data, fe->len, fe->hash);
+			free(fe->data);
 		}
 
 		if (exists(fe->hash, 0)){ //Check if file is already in DB.
@@ -340,6 +343,7 @@ void database_terminate()
 
 		cur = cur->next;
 
+		database_uncache(fe);
 		free(fe);
 		free(temp);
 	}
@@ -356,11 +360,57 @@ int database_getstats(struct db_stats *stats)
 		struct file_entry *fe = cur->data;
 		stats->files++;
 		stats->disk_use += fe->len;
+		if (fe->data){
+			stats->cache_entries++;
+			stats->cache_use += fe->len;
+		}
 	}
 	pthread_mutex_unlock(&lock);
 
 	stats->disk_max = (vfs.f_bsize * vfs.f_bfree) + stats->disk_use;
-	cache_getstats(stats);
+	stats->cache_max = config->max_cache_size;
 
 	return 0;
+}
+
+void cache_prune()
+{
+	size_t freed = 0; // Bytes freed.
+	size_t pruned = 0; // Files freed.
+
+	pthread_mutex_lock(&lock);
+
+	// Keep pruning the oldest cached object until max_cache_size is satisfied.
+	while (1){
+		struct file_entry *oldest = 0;
+		size_t size = 0;
+
+		for (struct lnode *cur = file_list; cur; cur = cur->next){
+			struct file_entry *fe = cur->data;
+
+			if (fe->data){
+				if (!oldest || fe->last_access < oldest->last_access)
+					oldest = fe;
+
+				size += fe->len;
+			}
+		}
+
+		if (oldest && size >= config->max_cache_size){
+			database_uncache(oldest);
+			freed += oldest->len;
+			pruned += 1;
+			continue;
+		}
+		break;
+	}
+
+	pthread_mutex_unlock(&lock);
+
+	if (pruned){
+		char strtime[512];
+		time_t t = time(0);
+		strftime(strtime, 512, TIME_FORMAT, localtime(&t));
+		printf("\033[1m%s, (database/cache):\033[m Pruned %zu files (%zu bytes) from cache\n", strtime, pruned, freed);
+	}
 }

@@ -83,7 +83,6 @@ void cleanup()
 
 	socket_terminate();
 	database_terminate();
-	cache_terminate();
 }
 
 void sigterm()

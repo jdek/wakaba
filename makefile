@@ -9,7 +9,7 @@ dev: sfhd
 release: CFLAGS += -O2 -g -fno-omit-frame-pointer -rdynamic -fstack-protector-all
 release: sfhd
 
-sfhd: main.o socket.o http.o database.o cache.o request.o *.h
+sfhd: main.o socket.o http.o database.o request.o *.h
 	$(CC) *.o $(CFLAGS) $(LDFLAGS)
 
 main.o: main.c *.h
@@ -23,9 +23,6 @@ http.o: http.c *.h
 
 database.o: database.c *.h
 	$(CC) database.c $(CFLAGS) -c
-
-cache.o: cache.c *.h
-	$(CC) cache.c $(CFLAGS) -c
 
 request.o: request.c *.h
 	$(CC) request.c $(CFLAGS) -c

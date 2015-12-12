@@ -96,8 +96,9 @@ void http_process_request(struct client_ctx *cc, struct request *r)
 			socket_puts(cc, "HTTP/1.0 100 Continue\r\n\r\n");
 
 		//Expand buf and read in rest of the body.
-		buf = realloc(buf, content_length);
+		buf = realloc(buf, content_length + 1);
 		buf_len += socket_read(cc, buf + buf_len, content_length - buf_len);
+		buf[buf_len] = 0;
 
 		//I wouldn't trust it, considering most of these requests are coming from /g/.
 		if (buf_len != content_length){
@@ -112,7 +113,7 @@ void http_process_request(struct client_ctx *cc, struct request *r)
 
 		// Get filename extension if provided.
 		start = strstr(buf, "filename=\"");
-		if (start){
+		if (start && strstr(buf, "\r\n\r\n") > start){
 			// Just re-using variables.
 			// Honestly i should just start lexing this shit because this is ugly as all hell.
 			start = strchr(start, '"');
@@ -131,7 +132,6 @@ void http_process_request(struct client_ctx *cc, struct request *r)
 				file_len = MIN(strlen(start), 31);
 				strncpy(r->ext, start, file_len);
 				r->ext[file_len] = 0;
-				puts(r->ext);
 			}
 		}
 

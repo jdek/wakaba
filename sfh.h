@@ -84,12 +84,6 @@ struct client_ctx{
 	struct request *r;
 };
 
-struct cache_entry{
-	char *data;
-	size_t len;
-	unsigned long long id;
-};
-
 struct db_stats{
 	size_t disk_max;
 	size_t disk_use;
@@ -131,17 +125,7 @@ int database_getstats(struct db_stats *stats);
 
 int database_rm(char *name);
 
-void cache_push(char *data, size_t len, unsigned long long id);
-
-struct cache_entry *cache_get(unsigned long long id);
-
-void cache_terminate();
-
 void cache_prune();
-
-void cache_getstats(struct db_stats *stats);
-
-int cache_rm(unsigned long long id);
 
 void *process_request(void *p);
 
