@@ -1,6 +1,10 @@
 #include "sfh.h"
 
-#define gen_post_response(BUF, LEN, ID) {snprintf(BUF, LEN, "%s/%llx\n", config->domainname, ID);}
+static void gen_post_response(char *buf, size_t len, struct request *r)
+{
+	if (!r->ext[0]) snprintf(buf, len, "%s/%llx\n", config->domainname, r->id);
+	else snprintf(buf, len, "%s/%llx.%s\n", config->domainname, r->id, r->ext);
+}
 
 void process_admincmd(struct client_ctx *cc)
 {
@@ -137,7 +141,7 @@ void *process_request(void *p)
 			printf("\033[1m%s, (request):\033[0m %s file of %zu bytes uploaded (%llx)\n", strtime, r.ext[0] ? r.ext : "Unknown", r.len, r.id);
 		}
 
-		gen_post_response(buf, 128, r.id);
+		gen_post_response(buf, 128, &r);
 		socket_puts(cc, buf);
 	}else if (r.type == R_GET){
 		database_getfile(&r);

@@ -210,6 +210,10 @@ void http_process_request(struct client_ctx *cc, struct request *r)
 		if (config->browser_cache && strcasestr(buf, "Cache-Control:"))
 			r->type = R_CACHED;
 
+		// The browser can use the file extension to guess the filetype and treat it correctly, but we don't actually need it so strip it.
+		char *dot = strchr(r->filename, '.');
+		if (dot) *dot = 0;
+
 		free(buf);
 	}
 
