@@ -1,6 +1,6 @@
 #include "sfh.h"
 
-#define gen_post_response(CC, BUF, LEN, ID) {snprintf(buf, 128, "%s/%llx\n", config->domainname, id);}
+#define gen_post_response(BUF, LEN, ID) {snprintf(BUF, LEN, "%s/%llx\n", config->domainname, ID);}
 
 void process_admincmd(struct client_ctx *cc)
 {
@@ -125,7 +125,7 @@ void *process_request(void *p)
 		process_admincmd(cc);
 	}else if (r.type == R_POST){
 		errno = 0;
-		unsigned long long id = database_push(&r);
+		database_push(&r);
 		char buf[128];
 
 		socket_puts(cc, HTTP_200);
@@ -134,10 +134,10 @@ void *process_request(void *p)
 			free(r.data);
 		}
 		else{
-			printf("\033[1m%s, (request):\033[0m File of %zu bytes uploaded (%llx)\n", strtime, r.len, id);
+			printf("\033[1m%s, (request):\033[0m %s file of %zu bytes uploaded (%llx)\n", strtime, r.ext[0] ? r.ext : "Unknown", r.len, r.id);
 		}
 
-		gen_post_response(cc, buf, 128, id);
+		gen_post_response(buf, 128, r.id);
 		socket_puts(cc, buf);
 	}else if (r.type == R_GET){
 		database_getfile(&r);
@@ -151,7 +151,7 @@ void *process_request(void *p)
 
 		printf("\033[1m%s, (request):\033[0m File %s requested (ref: \033[1m%s\033[0m)\n", strtime, r.filename, r.referer[0] ? r.referer : "none");
 
-		snprintf(http_header, 2048, "HTTP/1.0 200 OK\r\nContent-Length: %zu\r\nExpires: Sun, 17-jan-2038 19:14:07 GMT\r\n\r\n", r.len);
+		snprintf(http_header, 2048, "HTTP/1.0 200 OK\r\nContent-Length: %zu\r\nExpires: Sun, 17-jan-2038 19:14:07 GMT\r\nContent-Disposition: inline; filename=\"%llx.%s\"\r\n\r\n", r.len, r.id, r.ext[0] ? r.ext : "bin");
 		socket_puts(cc, http_header);
 		socket_write(cc, r.data, r.len);
 	}else if (r.type == R_CACHED){

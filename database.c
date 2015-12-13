@@ -35,11 +35,8 @@ void database_read(struct file_entry *fe)
 {
 	fe->last_access = time(0);
 	// Only read if isn't already cached.
-	if (fe->data){
-		puts("LOADED FROM CACHE");
-		return;
-	}
-	puts("LOADED FROM DISK");
+	if (fe->data) return;
+
 	char name[256];
 	serialize_id(fe->id, name, 256);
 
@@ -100,7 +97,7 @@ char exists(char *hash, unsigned long long *id)
 	return 0;
 }
 
-unsigned long long database_push(struct request *r)
+void database_push(struct request *r)
 {
 	struct lnode *n = calloc(sizeof(struct lnode), 1);
 	struct file_entry *fe = calloc(sizeof(struct file_entry), 1);
@@ -111,7 +108,8 @@ unsigned long long database_push(struct request *r)
 		free(fe);
 		free(n);
 		errno = EEXIST;
-		return id;
+		r->id = id;
+		return;
 	}
 
 	fe->data = r->data;
@@ -126,7 +124,8 @@ unsigned long long database_push(struct request *r)
 
 	database_write(fe);
 
-	return fe->id;
+	r->id = fe->id;
+	return;
 }
 
 struct lnode *database_get(unsigned long long id)
@@ -209,6 +208,8 @@ void database_getfile(struct request *r)
 
 		r->data = entry->data;
 		r->len = entry->len;
+		r->id = id;
+		strcpy(r->ext, entry->ext);
 	}
 }
 
@@ -251,7 +252,7 @@ int database_init()
 			database_read(&fe);
 			hash(fe.data, fe.len, fe.hash);
 
-			fprintf(fp, "%llx %zu %s\n", fe.id, fe.len, fe.hash);
+			fprintf(fp, "%llx %zu NULL %s\n", fe.id, fe.len, fe.hash);
 			free(fe.data);
 		}
 
@@ -263,12 +264,16 @@ int database_init()
 	while(!feof(fp)){
 		struct lnode *n = calloc(sizeof(struct lnode), 1);
 		struct file_entry *fe = calloc(sizeof(struct file_entry), 1);
-		fscanf(fp, "%llx %zu %s\n", &fe->id, &fe->len, fe->hash);
+		fscanf(fp, "%llx %zu %s %s\n", &fe->id, &fe->len, fe->ext, fe->hash);
 
 		if (fe->len == 0 || !isonfs(fe->id)){ //Not a valid entry.
 			free(n);
 			free(fe);
 			continue;
+		}
+
+		if (!strcmp(fe->ext, "NULL")){ // File has no extension.
+			fe->ext[0] = 0;
 		}
 
 		if (!strcmp(fe->hash, "0")){ //File has no hash, generate one.
@@ -322,7 +327,7 @@ int database_flush()
 
 	for (struct lnode *cur = listend(file_list); cur; cur = cur->prev){
 		struct file_entry *fe = cur->data;
-		fprintf(fp, "%llx %zu %s\n", fe->id, fe->len, fe->hash);
+		fprintf(fp, "%llx %zu %s %s\n", fe->id, fe->len, fe->ext[0] ? fe->ext : "NULL", fe->hash);
 	}
 
 	fclose(fp);

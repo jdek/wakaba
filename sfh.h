@@ -65,6 +65,7 @@ struct request{
 	char ext[32];
 	size_t len;
 	char *data;
+	unsigned long long id;
 };
 
 struct lnode{
@@ -111,7 +112,7 @@ size_t socket_gets(struct client_ctx *cc, char *buf, size_t len);
 
 void http_process_request(struct client_ctx *cc, struct request *r);
 
-unsigned long long database_push(struct request *r);
+void database_push(struct request *r);
 
 void database_getfile(struct request *r);
 
