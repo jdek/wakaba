@@ -37,6 +37,14 @@
 
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 
+#define LOG_DAEMON "daemon"
+#define LOG_DB "database"
+#define LOG_CACHE "cache"
+#define LOG_REQ "request"
+#define LOG_ADMIN "admin"
+#define LOG_SOCK "socket"
+#define LOG_GC "GC"
+
 struct config{
 	uint16_t port_http;
 	size_t max_cache_size;
@@ -234,6 +242,19 @@ static inline char *strcasestr(char *haystack, char *needle)
 	}
 
 	return 0;
+}
+
+static inline void log(char *module, char *msg, ...)
+{
+	static char strtime[512];
+	time_t t = time(0);
+	strftime(strtime, 512, TIME_FORMAT, localtime(&t));
+	printf("\033[1m%s, (%s):\033[0m ", strtime, module);
+
+	va_list va;
+	va_start(va, msg);
+	vprintf(msg, va);
+	putchar('\n');
 }
 
 #endif

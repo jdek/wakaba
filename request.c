@@ -27,18 +27,14 @@ void process_admincmd(struct client_ctx *cc)
 	strncpy(pwd, cmd, pwd_len);
 	pwd[pwd_len] = 0;
 
-	char strtime[512];
-	time_t t = time(0);
-	strftime(strtime, 512, TIME_FORMAT, localtime(&t));
-
 	if(strcmp(config->admin_pwd, pwd)){
 		socket_puts(cc, HTTP_200 "Access denied\n");
-		printf("\033[1m%s, \033[31m(admin)\033[0;1m:\033[0m Incorrect password\n", strtime);
+		log(LOG_ADMIN, "Incorrect password");
 		return;
 	}
 	cmd = pwd_delim + 1;
 
-	printf("\033[1m%s, \033[31m(admin)\033[0;1m:\033[0m \033[1mExecuted\033[0m command \"%s\"\n", strtime, cmd);
+	log(LOG_ADMIN, "Executed command \"%s\"", cmd);
 
 	char *err_inv = "Invalid syntax\n";
 
@@ -103,10 +99,6 @@ void *process_request(void *p)
 	http_process_request(cc, &r);
 	cc->r = &r;
 
-	char strtime[512];
-	time_t t = time(0);
-	strftime(strtime, 512, TIME_FORMAT, localtime(&t));
-
 	if (r.type == R_INVALID){
 		socket_puts(cc, HTTP_200);
 		switch(errno){
@@ -138,7 +130,7 @@ void *process_request(void *p)
 			free(r.data);
 		}
 		else{
-			printf("\033[1m%s, (request):\033[0m %s file of %zu bytes uploaded (%llx)\n", strtime, r.ext[0] ? r.ext : "Unknown", r.len, r.id);
+			log(LOG_REQ, "%s file of %zu bytes uploaded (%llx)", r.ext[0] ? r.ext : "Unknown", r.len, r.id);
 		}
 
 		gen_post_response(buf, 128, &r);
@@ -153,7 +145,7 @@ void *process_request(void *p)
 			goto RET;
 		}
 
-		printf("\033[1m%s, (request):\033[0m File %s requested (ref: \033[1m%s\033[0m)\n", strtime, r.filename, r.referer[0] ? r.referer : "none");
+		log(LOG_REQ, "File %llx requested (ref: %s)", r.id, r.referer[0] ? r.referer : "none");
 
 		snprintf(http_header, 2048, "HTTP/1.0 200 OK\r\nContent-Length: %zu\r\nExpires: Sun, 17-jan-2038 19:14:07 GMT\r\nContent-Disposition: inline; filename=\"%llx.%s\"\r\n\r\n", r.len, r.id, r.ext[0] ? r.ext : "bin");
 		socket_puts(cc, http_header);
@@ -168,7 +160,7 @@ void *process_request(void *p)
 			goto RET;
 		}
 
-		printf("\033[1m%s, (request):\033[0m Browser-cached file %s requested (ref: \033[1m%s\033[0m)\n", strtime, r.filename, r.referer[0] ? r.referer : "none");
+		log(LOG_REQ, "Browser-cached file %llx requested (ref: %s)", r.id, r.referer[0] ? r.referer : "none");
 
 		socket_puts(cc, http_header);
 	}

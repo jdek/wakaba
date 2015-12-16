@@ -194,9 +194,7 @@ int database_rm(char *name)
 	snprintf(buf, 512, DATA_DIR "/database/%llx", id);
 	remove(buf);
 
-	time_t t = time(0);
-	strftime(buf, 512, TIME_FORMAT, localtime(&t));
-	printf("\033[1m%s, (database):\033[m File %llx removed\n", buf, id);
+	log(LOG_DB, "File %llx removed", id);
 
 	return 0;
 }
@@ -221,11 +219,7 @@ void database_getfile(struct request *r)
 		// For some reason we couldn't load the file from disk.
 		// Unlink node from list and return.
 		if (!entry->data){
-			char strtime[512];
-			time_t t = time(0);
-			strftime(strtime, 512, TIME_FORMAT, localtime(&t));
-			printf("\033[1m%s, (database):\033[0m File %llx not found on disk, unlinking\n", strtime, entry->id);
-
+			log(LOG_DB, "File %llx not found on disk, unlinking", entry->id);
 			r->data = 0;
 			database_pop(n);
 			return;
@@ -286,6 +280,7 @@ int database_init()
 		fscanf(fp, "%llx %zu %s %s\n", &fe->id, &fe->len, fe->ext, fe->hash);
 
 		if (fe->len == 0 || !isonfs(fe->id)){ //Not a valid entry.
+			log(LOG_DB, "%llx: Invalid entry, ignoring", fe->id);
 			free(n);
 			free(fe);
 			continue;
@@ -302,6 +297,7 @@ int database_init()
 		}
 
 		if (exists(fe->hash, 0)){ //Check if file is already in DB.
+			log(LOG_DB, "%llx: Duplicate detected, removing and continuing", fe->id);
 			char buf[512];
 			snprintf(buf, 512, DATA_DIR "/database/%llx", fe->id);
 			remove(buf);
@@ -431,10 +427,6 @@ void cache_prune()
 
 	pthread_mutex_unlock(&lock);
 
-	if (pruned){
-		char strtime[512];
-		time_t t = time(0);
-		strftime(strtime, 512, TIME_FORMAT, localtime(&t));
-		printf("\033[1m%s, (database/cache):\033[m Pruned %zu files (%zu bytes) from cache\n", strtime, pruned, freed);
-	}
+	if (pruned)
+		log(LOG_CACHE, "Pruned %zu files (%zu bytes)", pruned, freed);
 }

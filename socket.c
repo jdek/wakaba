@@ -63,12 +63,7 @@ int socket_initialize()
 struct client_ctx *socket_nextclient()
 {
 	struct client_ctx *cc = socket_listen(&srv_http);
-
-	char strtime[512];
-	time_t t = time(0);
-	strftime(strtime, 512, TIME_FORMAT, localtime(&t));
-	printf("\033[1m%s, (socket):\033[0m Got connection\n", strtime);
-
+	log(LOG_SOCK, "Got connection");
 	return cc;
 }
 

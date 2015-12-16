@@ -22,7 +22,7 @@ void *cleaner()
 	while(1){
 		pthread_mutex_lock(&cleaner_lock);
 
-		int count = 0;
+		size_t count = 0;
 		struct lnode *cur = threads;
 		while (cur){
 			struct lnode *temp = cur;
@@ -41,12 +41,8 @@ void *cleaner()
 			}
 		}
 
-		if (count > 0){
-			char strtime[512];
-			time_t t = time(0);
-			strftime(strtime, 512, TIME_FORMAT, localtime(&t));
-			printf("\033[1m%s, (GC):\033[0m Cleaned up %i %s\n", strtime, count, count > 1 ? "threads" : "thread");
-		}
+		if (count)
+			log(LOG_GC, "Cleaned up %zu %s", count, count > 1 ? "threads" : "thread");
 
 		database_flush();
 		cache_prune();
@@ -59,10 +55,7 @@ void *cleaner()
 
 void cleanup()
 {
-	char strtime[512];
-	time_t t = time(0);
-	strftime(strtime, 512, TIME_FORMAT, localtime(&t));
-	printf("\033[1m%s, (server):\033[0m Server shutting down\n", strtime);
+	log(LOG_DAEMON, "Shutting down");
 
 	pthread_mutex_lock(&cleaner_lock);
 	pthread_mutex_lock(&threadlist_lock);
@@ -131,6 +124,9 @@ int load_config()
 			strncpy(config->admin_pwd, val, 128);
 		}else if (!strcmp(opt, "unix_sock_path")){
 			strncpy(config->unix_sock_path, val, 128);
+		}else{
+			fprintf(stderr, "Unknown option: %s\n", opt);
+			exit(1);
 		}
 	}
 
@@ -149,12 +145,12 @@ int main()
 	//Shrink user privileges
 	struct passwd *pw = getpwnam(config->username);
 	if (!pw || setuid(pw->pw_uid) == -1){
-		printf("\033[1;31mERROR:\033[0m Failed to set user to \"%s\"\n", config->username);
+		fprintf(stderr, "\033[1;31mERROR:\033[0m Failed to set user to \"%s\"\n", config->username);
 		return 1;
 	}
 
 	if (socket_initialize()){
-		puts("\033[1;31mERROR:\033[0m Failed to initialize server");
+		fputs("\033[1;31mERROR:\033[0m Failed to initialize server", stderr);
 		return 1;
 	}
 
@@ -177,10 +173,7 @@ int main()
 
 	pthread_create(&cleaner_thread, 0, cleaner, 0);
 
-	char strtime[512];
-	time_t t = time(0);
-	strftime(strtime, 512, TIME_FORMAT, localtime(&t));
-	printf("\033[1m%s, (server):\033[0m Server initialized\n", strtime);
+	log(LOG_DAEMON, "Server initialized");
 
 	while(1){
 		struct client_ctx *cc = socket_nextclient();
