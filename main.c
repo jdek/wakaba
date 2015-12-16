@@ -42,7 +42,7 @@ void *cleaner()
 		}
 
 		if (count)
-			log(LOG_GC, "Cleaned up %zu %s", count, count > 1 ? "threads" : "thread");
+			wkb_log(LOG_GC, "Cleaned up %zu %s", count, count > 1 ? "threads" : "thread");
 
 		database_flush();
 		cache_prune();
@@ -55,7 +55,7 @@ void *cleaner()
 
 void cleanup()
 {
-	log(LOG_DAEMON, "Shutting down");
+	wkb_log(LOG_DAEMON, "Shutting down");
 
 	pthread_mutex_lock(&cleaner_lock);
 	pthread_mutex_lock(&threadlist_lock);
@@ -173,7 +173,7 @@ int main()
 
 	pthread_create(&cleaner_thread, 0, cleaner, 0);
 
-	log(LOG_DAEMON, "Server initialized");
+	wkb_log(LOG_DAEMON, "Server initialized");
 
 	while(1){
 		struct client_ctx *cc = socket_nextclient();

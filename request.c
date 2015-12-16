@@ -29,12 +29,12 @@ void process_admincmd(struct client_ctx *cc)
 
 	if(strcmp(config->admin_pwd, pwd)){
 		socket_puts(cc, HTTP_200 "Access denied\n");
-		log(LOG_ADMIN, "Incorrect password");
+		wkb_log(LOG_ADMIN, "Incorrect password");
 		return;
 	}
 	cmd = pwd_delim + 1;
 
-	log(LOG_ADMIN, "Executed command \"%s\"", cmd);
+	wkb_log(LOG_ADMIN, "Executed command \"%s\"", cmd);
 
 	char *err_inv = "Invalid syntax\n";
 
@@ -130,7 +130,7 @@ void *process_request(void *p)
 			free(r.data);
 		}
 		else{
-			log(LOG_REQ, "%s file of %zu bytes uploaded (%llx)", r.ext[0] ? r.ext : "Unknown", r.len, r.id);
+			wkb_log(LOG_REQ, "%s file of %zu bytes uploaded (%llx)", r.ext[0] ? r.ext : "Unknown", r.len, r.id);
 		}
 
 		gen_post_response(buf, 128, &r);
@@ -145,7 +145,7 @@ void *process_request(void *p)
 			goto RET;
 		}
 
-		log(LOG_REQ, "File %llx requested (ref: %s)", r.id, r.referer[0] ? r.referer : "none");
+		wkb_log(LOG_REQ, "File %llx requested (ref: %s)", r.id, r.referer[0] ? r.referer : "none");
 
 		snprintf(http_header, 2048, "HTTP/1.0 200 OK\r\nContent-Length: %zu\r\nExpires: Sun, 17-jan-2038 19:14:07 GMT\r\nContent-Disposition: inline; filename=\"%llx.%s\"\r\n\r\n", r.len, r.id, r.ext[0] ? r.ext : "bin");
 		socket_puts(cc, http_header);
@@ -160,7 +160,7 @@ void *process_request(void *p)
 			goto RET;
 		}
 
-		log(LOG_REQ, "Browser-cached file %llx requested (ref: %s)", r.id, r.referer[0] ? r.referer : "none");
+		wkb_log(LOG_REQ, "Browser-cached file %llx requested (ref: %s)", r.id, r.referer[0] ? r.referer : "none");
 
 		socket_puts(cc, http_header);
 	}

@@ -63,7 +63,7 @@ int socket_initialize()
 struct client_ctx *socket_nextclient()
 {
 	struct client_ctx *cc = socket_listen(&srv_http);
-	log(LOG_SOCK, "Got connection");
+	wkb_log(LOG_SOCK, "Got connection");
 	return cc;
 }
 

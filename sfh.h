@@ -26,6 +26,7 @@
 #include <dirent.h>
 #include <execinfo.h>
 #include <assert.h>
+#include <stdarg.h>
 
 #define SERVER_BACKLOG 1024
 #define PACKET_SIZE 8192
@@ -244,7 +245,7 @@ static inline char *strcasestr(char *haystack, char *needle)
 	return 0;
 }
 
-static inline void log(char *module, char *msg, ...)
+static inline void wkb_log(char *module, char *msg, ...)
 {
 	static char strtime[512];
 	time_t t = time(0);
