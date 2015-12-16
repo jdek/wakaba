@@ -15,6 +15,15 @@ static struct lnode *file_list;
 
 #define serialize_id(ID, BUF, LEN) {snprintf(BUF, LEN, DATA_DIR "database/%llx", ID);}
 
+int isonfs(unsigned long long id)
+{
+	char name[256];
+	serialize_id(id, name, 256);
+
+	struct stat s;
+	return (stat(name, &s) == 0);
+}
+
 int database_write(struct file_entry *fe)
 {
 	char name[256];
@@ -34,6 +43,14 @@ int database_write(struct file_entry *fe)
 void database_read(struct file_entry *fe)
 {
 	fe->last_access = time(0);
+
+	// Check first that the file is present on disk before using the cache.
+	if (!isonfs(fe->id)){
+		if (fe->data) free(fe->data);
+		fe->data = 0;
+		return;
+	}
+
 	// Only read if isn't already cached.
 	if (fe->data) return;
 
@@ -201,8 +218,16 @@ void database_getfile(struct request *r)
 		entry = n->data;
 		database_read(entry);
 
+		// For some reason we couldn't load the file from disk.
+		// Unlink node from list and return.
 		if (!entry->data){
+			char strtime[512];
+			time_t t = time(0);
+			strftime(strtime, 512, TIME_FORMAT, localtime(&t));
+			printf("\033[1m%s, (database):\033[0m File %llx not found on disk, unlinking\n", strtime, entry->id);
+
 			r->data = 0;
+			database_pop(n);
 			return;
 		}
 
@@ -210,16 +235,10 @@ void database_getfile(struct request *r)
 		r->len = entry->len;
 		r->id = id;
 		strcpy(r->ext, entry->ext);
+		return;
 	}
-}
 
-int isonfs(unsigned long long id)
-{
-	char name[256];
-	serialize_id(id, name, 256);
-
-	struct stat s;
-	return (stat(name, &s) == 0);
+	r->data = 0;
 }
 
 int database_init()
