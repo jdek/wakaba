@@ -8,7 +8,7 @@ static pthread_mutex_t threadlist_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct config conf = {
 	.max_cache_size = 512000000, //512 MB
 	.domainname = "localhost",
-	.username = "http",
+	.username = "",
 	.db_persist = 0,
 	.browser_cache = 0,
 	.admin_pwd = "",
@@ -142,15 +142,17 @@ int main()
 	config = &conf;
 	load_config();
 
-	//Shrink user privileges
-	struct passwd *pw = getpwnam(config->username);
-	if (!pw || setuid(pw->pw_uid) == -1){
-		fprintf(stderr, "\033[1;31mERROR:\033[0m Failed to set user to \"%s\"\n", config->username);
-		return 1;
+	// Change user.
+	if (config->username[0]){
+		struct passwd *pw = getpwnam(config->username);
+		if (!pw || setuid(pw->pw_uid) == -1){
+			fprintf(stderr, "\033[1;31mERROR:\033[0m Failed to set user to \"%s\"\n", config->username);
+			return 1;
+		}
 	}
 
 	if (socket_initialize()){
-		fputs("\033[1;31mERROR:\033[0m Failed to initialize server", stderr);
+		fputs("\033[1;31mERROR:\033[0m Failed to initialize server\n", stderr);
 		return 1;
 	}
 
