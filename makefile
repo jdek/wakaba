@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = --std=c11 -Wall -Wextra -pedantic -pipe -march=native -mtune=native -pthread
-LDFLAGS = -o sfhd -lssl -lcrypto
+LDFLAGS = -o sfhd -lcrypto
 
 dev: CC = clang
 dev: CFLAGS += -g -O0 -fsanitize=address
