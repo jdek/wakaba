@@ -235,10 +235,33 @@ void database_getfile(struct request *r)
 	r->data = 0;
 }
 
+static void cp(char *src, char *dest)
+{
+	FILE *fpsrc = fopen(src, "r");
+	FILE *fpdest = fopen(dest, "w");
+
+	if (!fpsrc || !fpdest)
+		return;
+
+	char buf[4096];
+	size_t len;
+
+	while (!feof(fpsrc)){
+		len = fread(buf, 1, 4096, fpsrc);
+		fwrite(buf, 1, len, fpdest);
+	}
+
+	fclose(fpsrc);
+	fclose(fpdest);
+}
+
 int database_init()
 {
 	if (!config->db_persist)
 		return 0;
+
+	// Backup DB file before we fuck anything up.
+	cp(DATA_DIR "/database.txt", DATA_DIR "/database.txt.bak");
 
 	FILE *fp = fopen(DATA_DIR "/database.txt", "r");
 
@@ -246,6 +269,7 @@ int database_init()
 		fp = fopen(DATA_DIR "/database.txt", "w");
 		DIR *dp = opendir(DATA_DIR "/database/");
 		struct dirent *ent = 0;
+
 		if (!dp){
 			fclose(fp);
 			return 1;
