@@ -265,38 +265,8 @@ int database_init()
 
 	FILE *fp = fopen(DATA_DIR "/database.txt", "r");
 
-	if (!fp){ //Generate database.txt from contents on FS.
-		fp = fopen(DATA_DIR "/database.txt", "w");
-		DIR *dp = opendir(DATA_DIR "/database/");
-		struct dirent *ent = 0;
-
-		if (!dp){
-			fclose(fp);
-			return 1;
-		}
-
-		while ((ent = readdir(dp))){
-			if (ent->d_name[0] == '.' || ent->d_type == DT_DIR)
-				continue;
-
-			struct file_entry fe;
-			char *end = 0;
-
-			fe.id = strtoull(ent->d_name, &end, 16);
-			if (end && *end)
-				continue;
-			fe.len = 0; //Will be filled in by database_read.
-			database_read(&fe);
-			hash(fe.data, fe.len, fe.hash);
-
-			fprintf(fp, "%llx %zu NULL %s\n", fe.id, fe.len, fe.hash);
-			free(fe.data);
-		}
-
-		closedir(dp);
-		fclose(fp);
-		fp = fopen(DATA_DIR "/database.txt", "r");
-	}
+	if (!fp)
+		return 0;
 
 	while(!feof(fp)){
 		struct lnode *n = calloc(sizeof(struct lnode), 1);
